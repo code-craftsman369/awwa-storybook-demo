@@ -6,15 +6,17 @@ from pathlib import Path
 import numpy as np
 from fpdf import FPDF
 
-# ── Page config ──────────────────────────────────────────────
 st.set_page_config(page_title="Awwa Stories – Demo", page_icon="📖", layout="centered")
 
-# ── Secrets ──────────────────────────────────────────────────
 FAL_KEY = st.secrets.get("FAL_KEY", os.environ.get("FAL_KEY", ""))
 ANTHROPIC_API_KEY = st.secrets.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
 os.environ["FAL_KEY"] = FAL_KEY
 
-# ── Base illustration paths (GitHub repo relative) ────────────
+# デバッグ表示（後で消す）
+st.sidebar.write("FAL_KEY set:", bool(FAL_KEY))
+st.sidebar.write("ANTHROPIC_KEY set:", bool(ANTHROPIC_API_KEY))
+st.sidebar.write("FAL_KEY prefix:", FAL_KEY[:8] if FAL_KEY else "EMPTY")
+
 BASE_DIR = Path(__file__).parent
 SCENES = [
     ("scene_01", BASE_DIR / "illustrations" / "scene_01.jpg"),
@@ -31,21 +33,16 @@ CAPTIONS = [
     "Finally, Sara returns home to her family.",
 ]
 
-# ── Helpers ──────────────────────────────────────────────────
 def to_b64(filepath, mime="image/jpeg"):
     with open(filepath, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
-    return f"data:{mime};base64,{b64}"
-
-def to_b64_bytes(data: bytes, mime="image/jpeg"):
-    b64 = base64.b64encode(data).decode()
     return f"data:{mime};base64,{b64}"
 
 def _is_black(img):
     arr = np.array(img.convert("L"), dtype=float)
     return (arr.mean() / 255.0) < 0.02
 
-def analyze_child_photo(photo_bytes: bytes, ext: str) -> tuple:
+def analyze_child_photo(photo_bytes, ext):
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     photo_b64 = base64.b64encode(photo_bytes).decode()
     mime = "image/png" if ext.lower() == ".png" else "image/jpeg"
@@ -138,6 +135,7 @@ def _build_prompt(scene_id, child_desc, gender):
     return prompts.get(scene_id, f"Change the child character to look like: {child_desc}. Keep everything else unchanged. Do not add text.")
 
 def run_kontext(image_path, prompt, out_path, max_retries=3):
+    st.write(f"  🔄 Calling fal.ai for {Path(image_path).name}...")
     for attempt in range(max_retries):
         if attempt > 0:
             time.sleep(2)
@@ -158,9 +156,11 @@ def run_kontext(image_path, prompt, out_path, max_retries=3):
             img = Image.open(BytesIO(requests.get(url).content)).convert("RGB")
             if _is_black(img):
                 continue
-            img.save(out_path, "JPEG", quality=90)
+            img.save(out_path, "JPEG", quality=75)
+            st.write(f"  ✅ Done: {Path(out_path).name}")
             return out_path
         except Exception as e:
+            st.error(f"  ❌ fal.ai error (attempt {attempt+1}): {e}")
             if attempt == max_retries - 1:
                 shutil.copy(image_path, out_path)
                 return out_path
@@ -168,7 +168,6 @@ def run_kontext(image_path, prompt, out_path, max_retries=3):
     return out_path
 
 def generate_all_scenes(child_desc, gender, tmp_dir):
-    results = []
     for i, (scene_id, base_path) in enumerate(SCENES):
         out_path = str(Path(tmp_dir) / f"{scene_id}.jpg")
         if scene_id == "scene_05":
@@ -179,15 +178,18 @@ def generate_all_scenes(child_desc, gender, tmp_dir):
                 os.remove(tmp5)
         else:
             run_kontext(str(base_path), _build_prompt(scene_id, child_desc, gender), out_path)
-        results.append(out_path)
         yield i + 1, out_path
-    return results
 
 def build_pdf(image_paths, captions):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     for img_path, caption in zip(image_paths, captions):
         pdf.add_page()
-        pdf.image(img_path, x=10, y=10, w=277)
+        # 画像を圧縮してから追加
+        img = Image.open(img_path)
+        img = img.resize((1200, 675), Image.LANCZOS)
+        compressed = img_path.replace(".jpg", "_small.jpg")
+        img.save(compressed, "JPEG", quality=60)
+        pdf.image(compressed, x=10, y=10, w=277)
         pdf.set_xy(10, 185)
         pdf.set_font("Helvetica", "B", 14)
         pdf.cell(277, 10, caption, align="C")
@@ -214,10 +216,13 @@ if uploaded:
         ext = Path(uploaded.name).suffix
 
         with st.spinner("Analyzing photo..."):
-            child_desc, gender = analyze_child_photo(photo_bytes, ext)
-        st.success(f"Child detected: {child_desc}")
+            try:
+                child_desc, gender = analyze_child_photo(photo_bytes, ext)
+                st.success(f"✅ Child detected: {child_desc}")
+            except Exception as e:
+                st.error(f"❌ Claude API error: {e}")
+                st.stop()
 
-        # Save photo to temp
         tmp_dir = tempfile.mkdtemp()
         photo_path = os.path.join(tmp_dir, f"photo{ext}")
         with open(photo_path, "wb") as f:
@@ -237,14 +242,12 @@ if uploaded:
 
         st.success("🎉 Your story is ready!")
 
-        # Page-turn reader
         st.markdown("---")
         st.markdown("### 📖 Your Personalized Story")
         page = st.slider("Page", 1, 5, 1)
         st.image(scene_imgs[page - 1], use_container_width=True)
         st.markdown(f"**{CAPTIONS[page - 1]}**")
 
-        # PDF export
         st.markdown("---")
         with st.spinner("Building PDF..."):
             pdf_bytes = build_pdf(scene_imgs, CAPTIONS)
