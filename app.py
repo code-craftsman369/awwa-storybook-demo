@@ -112,14 +112,15 @@ def _build_prompt(scene_id, child_desc, gender):
             f"Preserve the anime picture book art style."
         ),
         "scene_05_left": (
-            f"This is a picture book illustration with TWO side-by-side pages. "
-            f"The LEFT page shows: a farm scene with a barn, yellow tractor, chickens, and a small standing child. "
-            f"The RIGHT page shows: inside a blue car with a bearded man driving, a child in center, woman in purple hijab on right. "
-            f"Task: Change ONLY the small standing child on the LEFT farm page "
-            f"to look like: {child_desc}. Keep {pronoun} clothing and pose unchanged. "
-            f"The RIGHT page with the blue car and all people inside must be pixel-perfect identical to the original. "
-            f"The farm background, barn, tractor, chickens, fence on the LEFT must stay unchanged. "
-            f"Do NOT add any text to the image. Preserve anime picture book art style."
+            f"This is a picture book spread with TWO side-by-side pages. "
+            f"LEFT page: a farm scene. There is a small child STANDING on the ground near a yellow tractor and a barn. "
+            f"The standing child wears a pink/magenta long dress and a white hijab. "
+            f"RIGHT page: inside a blue car. A bearded man is driving, a child sits in the center, a woman in purple hijab sits on the right. "
+            f"YOUR TASK: Change ONLY the face of the small STANDING child on the LEFT farm page "
+            f"to look like: {child_desc}. Keep {pronoun} white hijab, pink dress, and body pose exactly as-is. "
+            f"Do NOT touch the RIGHT page at all — the car, the bearded driver, the center child, and the purple hijab woman must remain pixel-perfect. "
+            f"Do NOT change the barn, tractor, chickens, fence, or any background on the LEFT. "
+            f"Do NOT add any text. Preserve soft anime picture book art style."
         ),
         "scene_05_car": (
             f"This illustration has TWO pages side by side. "
@@ -184,17 +185,19 @@ def generate_all_scenes(child_desc, gender, tmp_dir):
 
 def build_pdf(image_paths, captions):
     pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=False)
+    IMG_X, IMG_Y, IMG_W, IMG_H = 10, 8, 277, 156
+    TEXT_Y, TEXT_H = IMG_Y + IMG_H + 4, 10
     for img_path, caption in zip(image_paths, captions):
         pdf.add_page()
-        # 画像を圧縮してから追加
-        img = Image.open(img_path)
+        img = Image.open(img_path).convert("RGB")
         img = img.resize((1200, 675), Image.LANCZOS)
         compressed = img_path.replace(".jpg", "_small.jpg")
         img.save(compressed, "JPEG", quality=60)
-        pdf.image(compressed, x=10, y=10, w=277)
-        pdf.set_xy(10, 185)
+        pdf.image(compressed, x=IMG_X, y=IMG_Y, w=IMG_W, h=IMG_H)
+        pdf.set_xy(IMG_X, TEXT_Y)
         pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(277, 10, caption, align="C")
+        pdf.cell(IMG_W, TEXT_H, caption, align="C")
     buf = BytesIO()
     pdf.output(buf)
     return buf.getvalue()
