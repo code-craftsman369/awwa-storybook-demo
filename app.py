@@ -71,13 +71,15 @@ def _build_prompt(scene_id, child_desc, gender):
     pronoun = "his" if gender == "boy" else "her"
     prompts = {
         "scene_01": (
-            f"This is an anime-style picture book illustration. "
-            f"Find the child character riding a vehicle on the RIGHT half of the image. "
-            f"Replace only that character's face and hair to look like: {child_desc}. "
-            f"Keep the character's clothing, body, and pose completely unchanged. "
-            f"Keep the entire LEFT half and all background elements completely unchanged. "
-            f"Do NOT add any text, words, or letters anywhere in the image. "
-            f"Preserve the soft anime picture book art style."
+            f"This is an anime-style picture book illustration with TWO side-by-side pages. "
+            f"LEFT page: colorful dreamy sky with floating animals (cow, sheep, chicken, green leaves). "
+            f"RIGHT page: a child riding a yellow bulldozer with an orange cat, surrounded by pastel clouds. "
+            f"Change ONLY the face and hair of the child on the RIGHT page bulldozer "
+            f"to look like: {child_desc}. Keep {pronoun} clothing, body, and pose completely unchanged. "
+            f"Keep the orange cat completely unchanged. "
+            f"Keep the LEFT page with all floating animals completely unchanged. "
+            f"Keep all background clouds and colors completely unchanged. "
+            f"Do NOT add any text to the image. Preserve the soft anime picture book art style."
         ),
         "scene_02": (
             f"This is an anime-style picture book illustration of a sunny farm with wheat fields. "
