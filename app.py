@@ -148,7 +148,7 @@ def run_kontext(image_path, prompt, out_path, max_retries=3):
                 arguments={
                     "image_url": to_b64(image_path),
                     "prompt": prompt,
-                    "guidance_scale": 5.0,
+                    "guidance_scale": 7.0,
                     "num_inference_steps": 20,
                     "num_images": 1,
                     "safety_tolerance": "5",
